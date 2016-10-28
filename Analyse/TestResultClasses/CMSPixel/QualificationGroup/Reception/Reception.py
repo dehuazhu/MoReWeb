@@ -34,17 +34,6 @@ class TestResult(GeneralTestResult):
             }
         ]
 
-        if self.Attributes['IncludeIVCurve']:
-            self.ResultData['SubTestResultDictList'] += [
-                {
-                    'Key': 'IVCurve',
-                    'DisplayOptions': {
-                        'Order': 88,
-                        'Width': 2,
-                    }
-                },
-            ]
-
         self.ResultData['SubTestResultDictList'] += [
             {
                 'Key': 'BumpBondingMap',
@@ -103,17 +92,9 @@ class TestResult(GeneralTestResult):
                     'StorageKey': 'ReadbackStatus'
                 }
             },
-            {
-                'Key': 'Grading',
-                'DisplayOptions': {
-                    'Order': 15,
-                    'Width': 1,
-                    'Show': True,
-                },
-                'InitialAttributes': {
-                    'ModuleVersion': self.Attributes['ModuleVersion'],
-                },
-            },
+        ]
+
+        self.ResultData['SubTestResultDictList'] += [
             {
                 'Key': 'Database',
                 'DisplayOptions': {
@@ -124,8 +105,52 @@ class TestResult(GeneralTestResult):
                     'StorageKey': 'Database'
                 }
             },
+            {
+                'Key': 'DatabasePixelDefects',
+                'Module': 'Database',
+                'DisplayOptions': {
+                    'Width': 5,
+                    'Order': 201,
+                },
+                'InitialAttributes': {
+                    'StorageKey': 'DatabasePixelDefects',
+                    'Type': 'PixelDefects',
+                }
+            },
+            {
+                'Key': 'Logfile',
+                'DisplayOptions': {
+                    'Width': 1,
+                    'Order': 120,
+                    'Show': True,
+                }
+            },
         ]
 
+        if self.Attributes['IncludeIVCurve']:
+            self.ResultData['SubTestResultDictList'] += [
+                {
+                    'Key': 'IVCurve',
+                    'DisplayOptions': {
+                        'Order': 88,
+                        'Width': 2,
+                    }
+                },
+            ]
+
+        self.ResultData['SubTestResultDictList'] += [
+            {
+                'Key': 'Grading',
+                'DisplayOptions': {
+                    'Order': 15,
+                    'Width': 1,
+                    'Show': True,
+                },
+                'InitialAttributes': {
+                    'ModuleVersion': self.Attributes['ModuleVersion'],
+                },
+            }
+            ]
 
     def OpenFileHandle(self):
         self.check_Test_Software()
@@ -181,6 +206,7 @@ class TestResult(GeneralTestResult):
         # find pxar logfile of fulltest
         logfilePath = ("%s.log"%fileHandlePath[:-5]) if len(fileHandlePath) > 4 else ''
         self.pxarVersion = None
+        self.logfilePath = None
         if os.path.isfile(logfilePath):
             self.logfilePath = logfilePath
             try:
@@ -258,6 +284,53 @@ class TestResult(GeneralTestResult):
                 IVCurveData['IVSlope'] = float(
                     IVCurveTestResultData['KeyValueDictPairs']['Variation']['Value'])
 
+        NPixelDefects = self.ResultData['SubTestResults']['Grading'].ResultData['KeyValueDictPairs']['Defects']['Value']
+        PixelDefectsString = "%d"%NPixelDefects
+        try:
+            NPixelDefectsDB = self.ResultData['SubTestResults']['DatabasePixelDefects'].ResultData['HiddenData']['NPixelDefectsDB']
+            PixelDefectsString = PixelDefectsString + " (%d)"%NPixelDefectsDB
+            if NPixelDefects > 41:
+                if NPixelDefects >= 2 * NPixelDefectsDB:
+                    PixelDefectsString = "<span style='color:red;font-weight:bold;'>%s</span>" % PixelDefectsString
+                elif NPixelDefects >= 1.5 * NPixelDefectsDB:
+                    PixelDefectsString = "<span style='color:#f70;font-weight:bold;'>%s</span>" % PixelDefectsString
+        except:
+            pass
+
+        LeakageCurrentString = "-"
+        LeakageCurrent = -1
+        try:
+            LeakageCurrent = float(self.ResultData['SubTestResults']['IVCurve'].ResultData['KeyValueDictPairs']['CurrentAtVoltage150V']['Value'])
+            LeakageCurrentDB = 1e6*float(self.ResultData['SubTestResults']['Database'].ResultData['HiddenData']['LeakageCurrent150p17'])
+            LeakageCurrentString = "I=%1.2f"%(LeakageCurrent)
+            LeakageCurrentString = LeakageCurrentString + " (%1.2f)"%LeakageCurrentDB
+            if LeakageCurrent >= 2 * LeakageCurrentDB:
+                LeakageCurrentString = "<span style='color:red;font-weight:bold;'>%s</span>"%LeakageCurrentString
+            elif LeakageCurrent >= 1.5 * LeakageCurrentDB:
+                LeakageCurrentString = "<span style='color:#f70;font-weight:bold;'>%s</span>" % LeakageCurrentString
+        except:
+            pass
+
+        Comment = LeakageCurrentString
+        
+        try:
+            if self.ParentObject.CommentFromFile:
+                if len(Comment) < 1:
+                    Comment = self.ParentObject.CommentFromFile
+                else:
+                    Comment += "; " + self.ParentObject.CommentFromFile
+        except:
+            pass
+
+        try:
+            if self.CommentFromFile:
+                if len(Comment) < 1:
+                    Comment = self.CommentFromFile
+                else:
+                    Comment += "; " + self.CommentFromFile
+        except:
+            pass
+
         # fill DB row
         Row = {
             'ModuleID': self.Attributes['ModuleID'],
@@ -278,6 +351,17 @@ class TestResult(GeneralTestResult):
             'IVCurveFilePath': '',
             'TestTemperature': -1,
             'Temperature': -1,
+            'nCycles': 0,
+            'CycleTempLow': -1,
+            'CycleTempHigh': -1,
+            'nMaskDefects': -1,
+            'nDeadPixels': -1,
+            'nBumpDefects': -1,
+            'nTrimDefects': -1,
+            'nNoisyPixels': -1,
+            'nGainDefPixels': -1,
+            'nPedDefPixels': -1,
+            'nPar1DefPixels': -1,
             'RelativeModuleFinalResultsPath': os.path.relpath(self.TestResultEnvironmentObject.FinalModuleResultsPath,
                                                               self.TestResultEnvironmentObject.GlobalOverviewPath),
             'FulltestSubfolder': os.path.relpath(self.FinalResultsStoragePath,
@@ -298,7 +382,10 @@ class TestResult(GeneralTestResult):
 
         try:
             Row.update({
-                'PixelDefects': None,
+                'PixelDefects': "%d"%NPixelDefects,
+                'initialCurrent': "%1.2f"%LeakageCurrent,
+                'nDeadPixels': "%d"%self.ResultData['SubTestResults']['Grading'].ResultData['KeyValueDictPairs']['DeadPixels']['Value'],
+                'nBumpDefects': "%d"%self.ResultData['SubTestResults']['Grading'].ResultData['KeyValueDictPairs']['DefectiveBumps']['Value'],
                 'CurrentAtVoltage150V': IVCurveData['CurrentAtVoltage150V'],
                 'CurrentAtVoltage100V':IVCurveData['CurrentAtVoltage100V'],
                 'IVSlope': IVCurveData['IVSlope'],
@@ -308,12 +395,15 @@ class TestResult(GeneralTestResult):
                 'ROCsLessThanOnePercent': self.ResultData['SubTestResults']['Grading'].ResultData['HiddenData']['ROCsLessThanOnePercent'],
                 'ROCsMoreThanOnePercent': self.ResultData['SubTestResults']['Grading'].ResultData['HiddenData']['ROCsMoreThanOnePercent'],
                 'ROCsMoreThanFourPercent': self.ResultData['SubTestResults']['Grading'].ResultData['HiddenData']['ROCsMoreThanFourPercent'],
-                'Comments': '',
+                'Comments': Comment,
             })
         except:
             raise
-            pass
-            #test incomplete
+
+        if not self.TestResultEnvironmentObject.Configuration['Database']['UseGlobal']:
+            Row.update({
+                'PixelDefects': PixelDefectsString,
+            })
 
 
         print 'fill row end'

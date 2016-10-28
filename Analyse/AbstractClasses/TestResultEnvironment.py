@@ -69,6 +69,7 @@ class TestResultEnvironment:
         'PixelMapMinValue':0,
         'PixelMapMaskDefectUpperThreshold': 0,
         'BumpBondingProblemsNSigma': 5,
+        'BumpBondingProblemsMinDistanceFromPeak': 5,
         'XRayHighRateEfficiency_NInterpolationRates': 2,
         'XRayHighRateEfficiency_InterpolationRate1': 50,
         'XRayHighRateEfficiency_InterpolationRate2': 120,
@@ -93,6 +94,8 @@ class TestResultEnvironment:
         'XRayHighRate_missing_xray_pixels_C':168,
         'XRayHighRate_pixel_defects_B':42,
         'XRayHighRate_pixel_defects_C':168,
+        'OnShellQuickTest_LeakageCurrent_B': 2.0,
+        'OnShellQuickTest_LeakageCurrent_C': 10.0
     }
     XRayHRQualificationConfiguration = {
         'OmitGradesInFinalGrading':'',
@@ -109,7 +112,7 @@ class TestResultEnvironment:
     LocalDBConnectionCursor = None
 
     # Path to the test results
-    ModuleDataDirectory = '';
+    ModuleDataDirectory = ''
 
     # path to folder with all test results
     GlobalDataDirectory = ''
@@ -127,9 +130,9 @@ class TestResultEnvironment:
     # Path to the Overview
     GlobalOverviewPath = ''
 
-    LastUniqueIDCounter = 0;
+    LastUniqueIDCounter = 0
 
-    MoReWebVersion = 'unknown MoReWeb version'
+    MoReWebVersion = 'MoReWeb v1.0.0'
     MoReWebBranch = 'unknown branch'
 
     IVCurveFiles = {}
@@ -158,6 +161,11 @@ class TestResultEnvironment:
             self.Configuration['GzipSVG'] = int(Configuration.get('SystemConfiguration', 'GzipSVG'))
             self.Configuration['DefaultImageFormat'] = Configuration.get('SystemConfiguration', 'DefaultImageFormat')
             self.Configuration['RequiredTestTypesForComplete'] = Configuration.get('ProductionOverview', 'RequiredTestTypesForComplete')
+            try:
+                self.Configuration['IgnoreInSelectionList'] = Configuration.get('ProductionOverview', 'IgnoreInSelectionList')
+            except:
+                self.Configuration['IgnoreInSelectionList'] = ''
+
             self.Configuration['QualificationOverviewSort'] = Configuration.get('SystemConfiguration', 'QualificationOverviewSort')
 
             for i in self.GradingParameters:

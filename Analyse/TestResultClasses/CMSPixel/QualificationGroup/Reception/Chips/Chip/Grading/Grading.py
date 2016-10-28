@@ -67,12 +67,15 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         if 'BB4' in self.ParentObject.ResultData['SubTestResults'] and self.ParentObject.ResultData['SubTestResults']['BB4'].ResultData['Plot']['ROOTObject']:
             self.ResultData['HiddenData']['DeadBumpList'] = self.ParentObject.ResultData['SubTestResults']['BB4'].ResultData['KeyValueDictPairs']['DeadBumps']['Value']
             self.ResultData['HiddenData']['SpecialBumpBondingTestName'] = 'BB4'
-        elif 'BB2' in self.ParentObject.ResultData['SubTestResults'] and self.ParentObject.ResultData['SubTestResults']['BB2Map'].ResultData['Plot']['ROOTObject']:
+        elif 'BB2Map' in self.ParentObject.ResultData['SubTestResults'] and self.ParentObject.ResultData['SubTestResults']['BB2Map'].ResultData['Plot']['ROOTObject']:
             self.ResultData['HiddenData']['DeadBumpList'] = self.ParentObject.ResultData['SubTestResults']['BB2Map'].ResultData['KeyValueDictPairs']['MissingBumps']['Value']
             self.ResultData['HiddenData']['SpecialBumpBondingTestName'] = 'BB2'
         else:
             self.ResultData['HiddenData']['DeadBumpList'] = self.ParentObject.ResultData['SubTestResults']['BumpBondingProblems'].ResultData['KeyValueDictPairs']['DeadBumps']['Value']
             self.ResultData['HiddenData']['SpecialBumpBondingTestName'] = ''
+
+        if len(self.ResultData['HiddenData']['SpecialBumpBondingTestName']) > 0:
+            print "using special bump bonding test: %s"%self.ResultData['HiddenData']['SpecialBumpBondingTestName']
 
         # other pixel defects
         self.ResultData['HiddenData']['DeadPixelList'] = self.ParentObject.ResultData['SubTestResults']['PixelMap'].ResultData['KeyValueDictPairs']['DeadPixels']['Value']

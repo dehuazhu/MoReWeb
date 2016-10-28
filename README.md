@@ -1,54 +1,46 @@
-News
-=======
-
-Dec 15, 2015:
-
-- new improved BB2 cuts merged into master branch, thanks @andreavargas
-- development branch v0.7 which contains: new checks for bad double columns, FQ analysis speed up, more Readback test analysis, support for single test analysis and some improved plots -> will be merged into master branch in January 2016
-
-
 Info
 =======
 
-see the full changelog at:
-http://cmspixel.phys.ethz.ch/MoRe-Web/MoReWeb.html
+##### version 1.1.0
 
-##### version 0.6.7
+L1 HR tests: supports analysis of workaround tests of: XPixelAlive, HRScurves, CaldelScan
+new test: OnShellQuickTest for modules mounted on half shell, including table of modules on detector
+add scripts/decode.py to decode the raw events printed out py pXar logfiles
+add scripts/merge_rootfiles.py to combine several pXar rootfiles into one single file
 
-**IV grading**
+##### version 1.0.4
 
-Also grade on measured value of leakage current at -20 degrees (with the same criteria than at +17). This will affect grading of modules that have both a higher leakage current at -20 than at +17 and a leakage current at -20 larger than 10 uA. (Not seen any so far, but one module would almost fulfil these criteria)
+fix for filling DAC parameters created with recent pxar version into global DB
 
-##### version 0.6.6
+##### version 1.0.2
 
-**manual grading possible**
+fix for Reception tests for global DB
 
-how to: add a file grade.txt inside the 00\*\_Fulltest\_\* subfolder which contains the grade as letter (A,B,C) or number (1,2,3). (To add a comment: add a file called comment.txt to the main qualification directory, e.g. M\*\_FullQualification\_...)
+##### version 1.0.1 (DB re-processing with final grading)
 
-...
+few changes for reception tests
 
-##### version 0.6.4
+##### version 1.0.0
 
-**new grading for IV curves!**
+Same grading as in 0.7.3 version, but some small bugs fixed and some changes for global DB
 
-All FullQualifications should be re-analyzed with the new version! Re-fitting is not necessary if it has been done already with version v0.6.3.
+##### version 0.7.3
 
-...
+New bump bonding cut for standard pxar bump bonding test (BB) which can more reliably detect missing bumps if there are >90 per ROC.
 
-##### version 0.6.0
-Grading adjustments and bugfixes.
-All test should be re-analyzed (incl. re-fitting) with the new version with:
+##### version 0.7.2
 
-    ./Controller.py -r -f
-    
-to create the production overview page, run
-
-    ./Controller.py -p
-    
-##### Please test this feature and report any bugs or other feedback!
+New grading for double column defects (>1% inefficienct pixels per double column => C). Bugfixes for handling incomplete data and "fake test structures" to insert them into the DB.
+Improvements for Reception tests analysis, overview page and presentation.
 
 
+Requirements
+=======
 
+    Python 2.6 (2.7 recommended)
+    ROOT 5.34.19+ or ROOT 6
+    recent Web browser (min Firefox 4, Chrome 18, Safari 3, Opera 9, IE 10)
+    optional: MySQLdb python module
 
 MoReWeb
 =======

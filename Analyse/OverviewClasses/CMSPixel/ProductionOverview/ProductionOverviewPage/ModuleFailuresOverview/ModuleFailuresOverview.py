@@ -7,11 +7,7 @@ import time
 from AbstractClasses.Helper.BetterConfigParser import BetterConfigParser
 import json
 
-class SetEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, set):
-            return list(obj)
-        return json.JSONEncoder.default(self, obj)
+from AbstractClasses.Helper.SetEncoder import SetEncoder
 
 class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProductionOverview):
 
@@ -171,7 +167,6 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                                     DefectsDict[ModuleID]['DEFECT_%s'%Defect] = {}
                                 DefectsDict[ModuleID]['DEFECT_%s'%Defect][RowTuple['TestType']] = 'C'
                         except:
-                            raise
                             self.ProblematicModulesList.append(ModuleID)
 
         ### ManualGradeFT
@@ -351,6 +346,8 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                     elif 'B' in BBGrades:
                         DefectsDict[ModuleID]['BB_Fulltest'][RowTuple['TestType']] = 'B'
 
+### HIGH RATE TESTS
+
                 if RowTuple['TestType'] == TestTypeXrayHR:
 
         ### GradeHR
@@ -387,6 +384,18 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                             elif Value == 1:
                                 # also list grade A here because it can negate effect of other defects!
                                 DefectsDict[ModuleID]['ManualGradeHR'] = 'A'
+                        except:
+                            self.ProblematicModulesList.append(ModuleID)
+
+        ### DEFECTS for defects.txt
+                    Value = self.GetJSONValue([ RowTuple['RelativeModuleFinalResultsPath'], RowTuple['FulltestSubfolder'], 'XRayHRQualification', 'KeyValueDictPairs.json', 'SpecialDefects', 'Value'])
+                    if Value is not None:
+                        try:
+                            DefectsList = [x.strip() for x in Value.split(',')]
+                            for Defect in DefectsList:
+                                if 'DEFECT_%s'%Defect not in DefectsDict[ModuleID]:
+                                    DefectsDict[ModuleID]['DEFECT_%s'%Defect] = {}
+                                DefectsDict[ModuleID]['DEFECT_%s'%Defect] = 'C'
                         except:
                             self.ProblematicModulesList.append(ModuleID)
 
@@ -555,7 +564,11 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
         line1 = ROOT.TLine()
         line1.SetLineStyle(2)
         line1.SetLineWidth(1)
-        line1.SetLineColorAlpha(ROOT.kBlack, 0.35)
+        try:
+            line1.SetLineColorAlpha(ROOT.kBlack, 0.35)
+        except:
+            line1.SetLineColor(ROOT.kBlack) # for old root versions
+
         linePositions = [3*i for i in range(1, len(YLabels))]
 
         for linePosition in linePositions:

@@ -6,6 +6,8 @@ import glob
 import json
 import copy
 import sys
+import traceback
+import shutil
 
 class GeneralProductionOverview:
     LastUniqueIDCounter = 1
@@ -60,6 +62,7 @@ class GeneralProductionOverview:
         self.FullQualificationFullTests = ['m20_1', 'm20_2', 'p17_1']
         self.HiddenData = {}
         self.SubtestResults = {}
+        self.IncludeSorttable = False
         ### custom init
         self.CustomInit()
 
@@ -230,8 +233,9 @@ class GeneralProductionOverview:
     def GetFinalGrade(self, ModuleID, Rows = None):
         if not Rows:
             Rows = self.GetModuleQualificationRows(ModuleID)
+
+        ModuleGrades = []
         if self.ModuleQualificationIsComplete(ModuleID, Rows):
-            ModuleGrades = []
             GradedTestTypes = ['m20_1', 'm20_2', 'p17_1', 'XrayCalibration_Spectrum', 'XRayHRQualification']
             for RowTuple in Rows:
                 if RowTuple['ModuleID']==ModuleID:
@@ -259,18 +263,92 @@ class GeneralProductionOverview:
 
         # Stylesheet
         StylesheetHTMLTemplate = HtmlParser.getSubpart(HTMLTemplate, '###HEAD_STYLESHEET_TEMPLATE###')
+        AdditionalStylesheetHTML = ""
+        if self.IncludeSorttable:
+            AdditionalStylesheetHTML += '''
+table.sortable {
+    border-spacing: 0;
+    border: 1px solid #000;
+    border-collapse: collapse;
+}
+table.sortable th, table.sortable td {
+    text-align: left;
+    padding: 2px 4px 2px 4px;
+    width: 100px;
+    border-style: solid;
+    border-color: #444;
+}
+table.sortable th {
+    border-width: 0px 0px 0px 0px;
+    background-color: #ccc;
+    font-family      : Arial, helvetica, Verdana, sans-serif
+}
+table.sortable td {
+    border-width: 0px 0px 0px 0px;
+    font-family      : Arial, helvetica, Verdana, sans-serif
+}
+table.sortable tr.odd td {
+    background-color: #ddd;
+}
+table.sortable tr.even td {
+    background-color: #fff;
+}
+table.sortable tr.sortbottom td {
+    border-top: 1px solid #444;
+    background-color: #ccc;
+    font-weight: bold;
+}
+table.sortable tbody {
+    counter-reset: sortabletablescope;
+}
+table.sortable thead tr::before {
+    content: '';
+    display: table-cell;
+    background-color: #ccc;
+}
+table.sortable tbody tr::before {
+    content: counter(sortabletablescope);
+    counter-increment: sortabletablescope;
+    display: table-cell;
+    background-color: #ccc;
+    border: 1px solid #000;
+    border-color: #444;
+    padding: 2px 4px 2px 4px;
+    width: 30px;
+}
+            '''
         StylesheetHTML = HtmlParser.substituteMarkerArray(
             StylesheetHTMLTemplate,
             {
                 '###STYLESHEET###':self.TestResultEnvironmentObject.MainStylesheet+
-                    self.TestResultEnvironmentObject.ProductionOverviewStylesheet,
+                    self.TestResultEnvironmentObject.ProductionOverviewStylesheet+ AdditionalStylesheetHTML,
             }
         )
+
         FinalHTML = HtmlParser.substituteSubpart(
             FinalHTML,
             '###HEAD_STYLESHEETS###',
             StylesheetHTML
         )
+
+        # Javsscripts
+        ScriptHTML = ''
+        if self.IncludeSorttable:
+            ScriptHTML += "\n<script src='sorttable.js'></script>\n"
+            sorttableSource = 'HTML/ProductionOverview/sorttable.js'
+            sorttableDest = self.GlobalOverviewPath+'/'+self.Attributes['BasePath'] + 'sorttable.js'
+            try:
+                shutil.copy(sorttableSource, sorttableDest)
+            except:
+                print "can't copy sorttable.js from:"
+                print " <- ", sorttableSource
+                print " -> ", sorttableDest
+
+        FinalHTML = HtmlParser.substituteMarkerArray(
+            FinalHTML,
+            {'###ADDITIONALSCRIPTS###': ScriptHTML}
+        )
+
         FinalHTML = HtmlParser.substituteSubpart(
             FinalHTML,
             '###HEAD_STYLESHEET_TEMPLATE###',
@@ -309,13 +387,33 @@ class GeneralProductionOverview:
             SubPageObject = SubPage['ProductionOverview'].ProductionOverview(TestResultEnvironmentObject=self.TestResultEnvironmentObject, InitialAttributes = InitialAttributes, ParentObject = self, Verbose=self.Verbose)
 
             ### generate html overview of submodule
-            #try:
-            SubPageContentHTML = SubPageObject.GenerateOverview()
+            try:
+                SubPageContentHTML = SubPageObject.GenerateOverview()
 
-            self.SubtestResults[SubPage['Key']] = {}
-            self.SubtestResults[SubPage['Key']]['HiddenData'] = SubPageObject.HiddenData
-            #except:
-            #    SubPageContentHTML = "sub page module not found or 'SubPage['ProductionOverview'].GenerateOverview()' failed"
+                self.SubtestResults[SubPage['Key']] = {}
+                self.SubtestResults[SubPage['Key']]['HiddenData'] = SubPageObject.HiddenData
+            except Exception as inst:
+                # Start red color
+                sys.stdout.write("\x1b[31m")
+                sys.stdout.flush()
+                print "Sub page module not found or GenerateOverview() failed:"
+                print inst
+                print "------"
+                # Print traceback
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                traceback.print_exception(exc_type, exc_obj, exc_tb)
+                # Reset color
+                sys.stdout.write("\x1b[0m")
+                sys.stdout.flush()
+
+                SubPageContentHTML = "<div style='background-color:#ecc;color:#700;float:left;'><b>sub page module not found or GenerateOverview() failed:</b><br>"
+                SubPageContentHTML += '<br>'.join(traceback.format_list(traceback.extract_tb(exc_tb))).replace('\n','')
+                SubPageContentHTML += '</div>'
+
+            try:
+                SubPageObject.CloseFileHandles()
+            except:
+                print "could not close open files!"
 
             ### add to this module html page
             if SubPageContentHTML is not None:
@@ -392,6 +490,7 @@ class GeneralProductionOverview:
         if Style:
             for StyleElement in Style:
                 StyleCSS += "%s:%s;"%(StyleElement, Style[StyleElement])
+
         HTML = HtmlParser.substituteMarkerArray(
                     PlotTemplate,
                     {
@@ -411,7 +510,7 @@ class GeneralProductionOverview:
                 )
         return HTML
 
-    def Table(self, TableData, RowLimit = 999):
+    def Table(self, TableData, RowLimit = 999, TableClass = '', TableStyle = ''):
 
         HtmlParser = self.TestResultEnvironmentObject.HtmlParser
         TableHTMLTemplate = self.TestResultEnvironmentObject.ProductionOverviewTableHTMLTemplate
@@ -465,6 +564,8 @@ class GeneralProductionOverview:
             HtmlParser.substituteSubpart(TableHTMLTemplate, '###TABLE_ROW###', TableRows),
                 {
                         '###TABLEID###': TableID,
+                        '###TABLECLASS###': TableClass,
+                        '###TABLESTYLE###': TableStyle
                 })
 
         # button to show hidden rows
@@ -519,7 +620,12 @@ class GeneralProductionOverview:
             for i in range(0, PrimitivesList.GetSize()):
                 if PrimitivesList.At(i).GetName().find(HistName) > -1:
                     ClonedROOTObject = PrimitivesList.At(i).Clone(self.GetUniqueID())
+                    try:
+                        ClonedROOTObject.SetDirectory(0)
+                    except:
+                        pass
                     HistogramFound = True
+                    RootFile.Close()
                     break
 
             if HistogramFound:
@@ -876,7 +982,7 @@ class GeneralProductionOverview:
                         if CloneHistogram2.GetBinLowEdge(i) > GradeAB:
                             CloneHistogram2.SetBinContent(i, PlotMaximum)
 
-                    CloneHistogram2.SetFillColorAlpha(ROOT.kRed, 0.15)
+                    CloneHistogram2.SetFillColorAlpha(ROOT.kGreen+2, 0.15)
                     CloneHistogram2.SetFillStyle(1001)
                     CloneHistogram2.Draw("same;b")
 
@@ -885,7 +991,7 @@ class GeneralProductionOverview:
                         if CloneHistogram3.GetBinLowEdge(i) <= GradeBC:
                             CloneHistogram3.SetBinContent(i, PlotMaximum)
 
-                    CloneHistogram3.SetFillColorAlpha(ROOT.kGreen+2, 0.1)
+                    CloneHistogram3.SetFillColorAlpha(ROOT.kRed, 0.1)
                     CloneHistogram3.SetFillStyle(1001)
                     CloneHistogram3.Draw("same;b")
 

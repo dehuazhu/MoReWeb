@@ -54,6 +54,7 @@ class GeneralTestResult(object):
         self.testSoftware = None
         self.HistoDict = None
         self.version = None
+        self.isPROC = False
         self.nRocs = 0
         self.halfModule = 0
         self.CommentFromFile = None
@@ -110,6 +111,7 @@ class GeneralTestResult(object):
             'Order': 0,
             'Width': 1,
             'GroupWithNext': False,
+            'Floating': False,
         }
 
         # Result array
@@ -173,6 +175,7 @@ class GeneralTestResult(object):
         if ParentObject:
             self.ParentObject = ParentObject
             self.RawTestSessionDataPath = self.ParentObject.RawTestSessionDataPath
+            self.isPROC = ParentObject.isPROC
 
         if InitialAttributes:
             self.Attributes.update(InitialAttributes)
@@ -191,6 +194,7 @@ class GeneralTestResult(object):
             'YLimitC': None,  # limit for grading
         }
 
+        self.ROOTObjects = []
         self.CustomInit()
 
         if not self.Title:
@@ -376,15 +380,15 @@ class GeneralTestResult(object):
         if os.path.isfile(gradefilename):
             try:
                 gradefile = open(gradefilename)
+                grade = gradefile.read().strip()
+                gradefile.close()
+                # grade can be given either as number 1,2,3 or as letter A,B,C
+                GradeNames = ['A','B','C']
+                if grade in GradeNames:
+                    grade = 1 + GradeNames.index(grade)
+                print "Reading a manual grade "+str(grade)+" specified by the user in "+str(gradefilename)
             except:
                 warnings.warn('cannot open manual grade file {file}'.format(file=gradefilename))
-            grade = gradefile.read().strip()
-            gradefile.close()
-            # grade can be given either as number 1,2,3 or as letter A,B,C
-            GradeNames = ['A','B','C']
-            if grade in GradeNames:
-                grade = 1 + GradeNames.index(grade)
-            print "Reading a manual grade "+str(grade)+" specified by the user in "+str(gradefilename)
         else:
             print " => not found."
         return grade
@@ -460,10 +464,13 @@ class GeneralTestResult(object):
             except (KeyError,ConfigParser.NoOptionError,ConfigParser.NoSectionError):
                 halfModule = 0
         version = version.rstrip('\n')
+        if version and ('proc' in version or 'psi46digplus' in version or 'psi46digl1' in version):
+            self.isPROC = True
         if self.verbose:
             print 'Version:    ', version
             print 'nRocs:      ', nRocs
             print 'halfModule: ', halfModule
+            print 'isPROC:     ', self.isPROC
         self.version = version
         self.nRocs = nRocs
         self.halfModule = halfModule
@@ -1005,8 +1012,12 @@ class GeneralTestResult(object):
         MyObjectTestDate = ''
         VersionInfo = ''
         if RecursionLevel == 0 and TestResultObject.Attributes['TestDate']:
-            MyObjectTestDate = 'Test Date: ' + datetime.datetime.fromtimestamp(
-                float(TestResultObject.Attributes['TestDate'])).strftime("%Y-%m-%d %H:%M") + '<br><span style="font-size:10.5pt;" title="' + self.TestResultEnvironmentObject.MoReWebVersion + '">Analysis date: ' + datetime.datetime.now().strftime("%Y-%m-%d %H:%M") + '</span>'
+            try:
+                MyObjectTestDate = 'Test Date: ' + datetime.datetime.fromtimestamp(
+                    float(TestResultObject.Attributes['TestDate'])).strftime("%Y-%m-%d %H:%M") + '<br><span style="font-size:10.5pt;" title="' + self.TestResultEnvironmentObject.MoReWebVersion + '">Analysis date: ' + datetime.datetime.now().strftime("%Y-%m-%d %H:%M") + '</span>'
+            except:
+                print "\x1b[31mERROR: can't read test date from TestResultObject:", TestResultObject, "\x1b[0m"
+                MyObjectTestDate = 'Test Date: unknown'
             VersionInfo = self.TestResultEnvironmentObject.MoReWebVersion + " on branch " + self.TestResultEnvironmentObject.MoReWebBranch
 
         MainTestResultAdditionalClasses = ''
@@ -1175,17 +1186,19 @@ class GeneralTestResult(object):
                 if i['TestResultObject'].DisplayOptions['Show']:
 
                     GroupCSSClass = ''
-                    if i2 % 5 == 0:
-                        GroupCSSClass += ' WidthNthChild5n'
-                    if i2 % 4 == 0:
-                        GroupCSSClass += ' WidthNthChild4n'
-                    if i2 % 3 == 0:
-                        GroupCSSClass += ' WidthNthChild3n'
-                    if i2 % 2 == 0:
-                        GroupCSSClass += ' WidthNthChild2n'
 
-                    if i['TestResultObject'].DisplayOptions['Width'] > 1:
-                        GroupCSSClass += ' Width' + str(i['TestResultObject'].DisplayOptions['Width'])
+                    if not i['TestResultObject'].DisplayOptions['Floating']:
+                        if i2 % 5 == 0:
+                            GroupCSSClass += ' WidthNthChild5n'
+                        if i2 % 4 == 0:
+                            GroupCSSClass += ' WidthNthChild4n'
+                        if i2 % 3 == 0:
+                            GroupCSSClass += ' WidthNthChild3n'
+                        if i2 % 2 == 0:
+                            GroupCSSClass += ' WidthNthChild2n'
+
+                        if i['TestResultObject'].DisplayOptions['Width'] > 1:
+                            GroupCSSClass += ' Width' + str(i['TestResultObject'].DisplayOptions['Width'])
 
                     if not GroupWithNext:
                         SubTestResultListHTML += HtmlParser.substituteMarker(
@@ -1323,9 +1336,30 @@ class GeneralTestResult(object):
     def WriteToDatabase(self, ParentID=0):
         ColumnMapping = {}
         ID = 0
-        ID = self.CustomWriteToDatabase(ParentID)
-
         WriteToDBSuccess = True
+
+        try:
+            ID = self.CustomWriteToDatabase(ParentID)
+        except Exception as inst:
+            if ParentID > 0:
+                raise
+            else:
+                # Start red color
+                sys.stdout.write("\x1b[31m")
+                sys.stdout.flush()
+                print 'Error in test (write to database)'
+                print inst
+                print inst.args
+                print sys.exc_info()[0]
+                print "\n\n------\n"
+                # Print traceback
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                traceback.print_exception(exc_type, exc_obj, exc_tb)
+                # Reset color
+                sys.stdout.write("\x1b[0m")
+                sys.stdout.flush()
+                WriteToDBSuccess = False
+
         for i in self.ResultData['SubTestResults']:
             try:
                 SubtestWriteToDBSuccess = self.ResultData['SubTestResults'][i].WriteToDatabase(ID)
@@ -1381,6 +1415,35 @@ class GeneralTestResult(object):
             JSONDictionary[jsonFileName] = JSONData
         f.write(json.dumps(JSONDictionary, sort_keys=True, indent=4, separators=(',', ': '), cls=SetEncoder))
         f.close()
+
+    def CleanUp(self, Level = 0):
+        if self.verbose and Level < 1:
+            print "\x1b[44m\x1b[97mCalling 'CleanUp' for %s\x1b[0m"%self.Name
+
+        # clean up subtests
+        for i in self.ResultData['SubTestResults']:
+            SubTestResult = self.ResultData['SubTestResults'][i]
+            try:
+                SubTestResult.CleanUp(Level + 1)
+            except:
+                raise
+
+        # clean up own plots
+        if self.ResultData['Plot']['ROOTObject']:
+            if self.verbose:
+                print "\x1b[45m\x1b[97mgarbage collected: %s.%r\x1b[0m"%(self.Name, self.ResultData['Plot']['ROOTObject'])
+            self.ResultData['Plot']['ROOTObject'].IsA().Destructor(self.ResultData['Plot']['ROOTObject'])
+
+        if self.ROOTObjects:
+            for i in self.ROOTObjects:
+                if i:
+                    try:
+                        if self.verbose:
+                            print "\x1b[45m\x1b[97mgarbage collected: %r\x1b[0m"%(i)
+                        i.IsA().Destructor(i)
+                    except:
+                        pass
+        self.CloseSubTestResultFileHandles()
 
     def __del__(self):
         self.CloseSubTestResultFileHandles()

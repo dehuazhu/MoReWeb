@@ -9,7 +9,8 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         self.NameSingle = 'Grading'
         self.Title = 'Grading'
         self.Attributes['TestedObjectType'] = 'CMSPixel_Module'
-
+        self.ResultData['KeyValueDictPairs']['SpecialDefects'] = {'Label': 'Defects', 'Value': ''}
+        self.ResultData['HiddenData']['SpecialDefects'] = []
 
     def getNumberOfRocsWithGrade(self, Grade, GradeList):
         l = [i for i in GradeList if i == Grade]
@@ -35,6 +36,7 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         SubGrading = []
 
         PixelDefects = 0
+        DoubleColumnDefects = 0
         BumpBondingDefects = 0
         NoiseDefects = 0
         HotPixelDefects = 0
@@ -87,6 +89,14 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
                 BumpBondingDefects += BumpBondingDefectsROC
                 NoiseDefects += NoiseDefectsROC
                 HotPixelDefects += HotPixelDefectsROC
+
+                try:
+                    DoubleColumnDefectsROC = int(i['TestResultObject'].ResultData['SubTestResults']['Grading'].ResultData['KeyValueDictPairs']['BadDoubleColumns']['Value'])
+                except:
+                    DoubleColumnDefectsROC = 0
+
+                if DoubleColumnDefectsROC > 0:
+                    DoubleColumnDefects += DoubleColumnDefectsROC
 
                 # get ROC pixel defect lists
                 HotPixelsListROC = i['TestResultObject'].ResultData['SubTestResults']['Grading'].ResultData['HiddenData']['HotPixelDefectsList']['Value']
@@ -148,10 +158,25 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
                     sys.stdout.write("\x1b[0m")
                     sys.stdout.flush()
 
-        # check for test completenes
+        # check for test completeness
         if TestIncomplete:
             print "\x1b[31mX-ray test incomplete/bad format => GRADE C\x1b[0m"
             ModuleGrade = 3
+
+        # special defects from 'defects.txt' => grade C
+        SpecialDefectsList = []
+        try:
+            UserSpecifiedDefects = self.check_for_defects()
+            SpecialDefectsList += UserSpecifiedDefects
+        except:
+            print "checking for user specified defect information in defects.txt failed!"
+            pass
+
+        SpecialDefectsList = list(set(SpecialDefectsList))
+        if len(SpecialDefectsList) > 0:
+            ModuleGrade = 3
+            SpecialDefects = ", ".join(SpecialDefectsList)
+            self.ResultData['HiddenData']['SpecialDefects'] = SpecialDefects
 
         #if grade was manually specified, apply it
         GradeComment = ''
@@ -189,6 +214,9 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         if HotPixelDefects < 0:
             HotPixelDefects = -1
 
+        if DoubleColumnDefects < 0:
+            DoubleColumnDefects = -1
+
         SubGradings['PixelDefects'] = SubGrading
         self.ResultData['KeyValueDictPairs'] = {
             'Module': {
@@ -214,6 +242,10 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
             'PixelDefects': {
                 'Value': PixelDefects,
                 'Label': 'Total Pixel Defects'
+            },
+            'NBadDoubleColumns': {
+                'Value': DoubleColumnDefects,
+                'Label': 'Double Column Defects'
             },
             'Efficiency_50': {
                 'Value': MeanEfficiency50,
@@ -278,7 +310,7 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
             'Value': TotalDefectPixelsList
         }
 
-        #
+        # manual regrading
         if ManualGrade != '':
             self.ResultData['KeyValueDictPairs']['ManualGrade'] = {'Label': 'Manual grade', 'Value': str(int(ManualGrade))}
             self.ResultData['KeyList'].append('ManualGrade')

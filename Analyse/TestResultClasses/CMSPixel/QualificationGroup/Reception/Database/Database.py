@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 import AbstractClasses
 import os
+import sys
+import traceback
+
+from AbstractClasses.Helper.GlobalDatabaseQuery import GlobalDatabaseQuery
 
 class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
     def CustomInit(self):
@@ -8,6 +12,7 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         self.Name = 'CMSPixel_QualificationGroup_Reception_%s_TestResult'%self.NameSingle
         self.Title = 'Database comparison'
         self.Attributes['TestedObjectType'] = 'CMSPixel_Module'
+
 
     def GradeColoredValue(self, value, grade, center=False):
         GradeAHTMLTemplate = "<div style='%s'>%s</div>"
@@ -43,23 +48,78 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         except:
             return self.GradeColoredValue(value, 3)
 
-    def PopulateResultData(self):
 
+    def PopulateResultData(self):
+        if self.TestResultEnvironmentObject.Configuration['Database']['UseGlobal']:
+            return
+
+        if 'Type' in self.Attributes and self.Attributes['Type'] == 'PixelDefects':
+            self.PopulateResultDataPixelDefects()
+            self.Title += " - Pixel Defects"
+        else:
+            self.PopulateResultDataFullQualifications()
+
+    def PopulateResultDataFullQualifications(self):
+
+        LeakageCurrent150p17 = -1
+        try:
+            ModuleID = self.ParentObject.Attributes['ModuleID']
+            DB = GlobalDatabaseQuery()
+            rows = DB.GetFullQualificationResult(ModuleID=ModuleID)
+
+            HeaderRow = ['FULLMODULE_ID', 'GRADE', 'BAREMODULE_ID', 'HDI_ID', 'SENSOR_ID', 'BUILTON', 'BUILTBY', 'STATUS', 'tempnominal', 'I150', 'IVSLOPE', 'PIXELDEFECTS']
+            if len(rows) >0:
+                for k,v in rows[0].items():
+                    if k not in HeaderRow:
+                        HeaderRow.append(k)
+            self.ResultData['Table'] = {
+               'HEADER': [HeaderRow],
+               'BODY': [],
+               'FOOTER': [],
+            }
+
+            for row in rows:
+                FulltestRow = []
+                for k in HeaderRow:
+                    FulltestRow.append(row[k] if k in row else '-')
+                    if k == 'I150' and row['tempnominal'] == 'p17_1':
+                        try:
+                            LeakageCurrent150p17 = float(row[k])
+                        except:
+                            LeakageCurrent150p17 = -2
+
+                self.ResultData['Table']['BODY'].append(FulltestRow)
+
+            IVdata = DB.GetFulltestIVCurve(ModuleID=ModuleID)
+            self.ResultData['HiddenData']['IVCurveDB'] = IVdata
+            if len(IVdata) < 1:
+                print "\x1b[31merror: can't read IV curve from global DB!\x1b[0m"
+
+        except:
+            self.ResultData['Table'] = {
+               'HEADER': [['Error']],
+               'BODY': [["Can't compare with DB, either no connection or module not in database!"]],
+               'FOOTER': [],
+            }
+
+
+        self.ResultData['HiddenData']['LeakageCurrent150p17'] = LeakageCurrent150p17
+
+
+    def PopulateResultDataPixelDefects(self):
         chipResults = self.ParentObject.ResultData['SubTestResults']['Chips'].ResultData['SubTestResultDictList']
         nChips = len(chipResults)
         gradingResult = self.ParentObject.ResultData['SubTestResults']['Grading']
 
         HeaderRow = ['',
                    'Total',
-                   'Dead',
-                   'Bump',
-                   'D']
+                   'Dead']
         if nChips > 1:
-            for i in range(nChips-1):
+            for i in range(nChips):
                 HeaderRow.append('')
-        HeaderRow.append('B')
+        HeaderRow.append('Bump')
         if nChips > 1:
-            for i in range(nChips-1):
+            for i in range(nChips):
                 HeaderRow.append('')
 
         self.ResultData['Table'] = {
@@ -75,8 +135,8 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         ROCRow = [
                '',
                '',
-               '',
-               '']
+               ''
+               ]
         ROCRowResults = []
         i = 0
         for chipResult in chipResults:
@@ -91,6 +151,7 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
             )
             i += 1
         ROCRow += ROCRowResults
+        ROCRow += ['']
         ROCRow += ROCRowResults
 
         self.ResultData['Table']['BODY'].append(ROCRow)
@@ -99,10 +160,10 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         ReceptionDataRow = ['Reception']
 
         # pixel defects per module
-        NDefects = gradingResult.ResultData['KeyValueDictPairs']['Defects']['Value']
-        NDeadPixels = gradingResult.ResultData['KeyValueDictPairs']['DeadPixels']['Value']
-        NDefectiveBumps = gradingResult.ResultData['KeyValueDictPairs']['DefectiveBumps']['Value']
-        ReceptionDataRow += [NDefects, NDeadPixels, NDefectiveBumps]
+        NDefects = 0 #gradingResult.ResultData['KeyValueDictPairs']['Defects']['Value']
+        NDeadPixels = 0 #gradingResult.ResultData['KeyValueDictPairs']['DeadPixels']['Value']
+        NDefectiveBumps = 0 #gradingResult.ResultData['KeyValueDictPairs']['DefectiveBumps']['Value']
+
 
         # pixel defects per ROC
         NDefectiveBumpsList = []
@@ -113,11 +174,57 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
             NDeadPixelsROC = int(chipResult['TestResultObject'].ResultData['SubTestResults']['Grading'].ResultData['HiddenData']['NDeadPixels'])
             NDefectiveBumpsList.append(NDefectiveBumpsROC)
             NDeadPixelsList.append(NDeadPixelsROC)
+
+            NDeadPixels +=  NDeadPixelsROC
+            NDefectiveBumps += NDefectiveBumpsROC
+            NDefects += NDeadPixelsROC + NDefectiveBumpsROC
+
+        ReceptionDataRow += [NDefects, NDeadPixels]
+
         ReceptionDataRow += NDeadPixelsList
+        ReceptionDataRow += [NDefectiveBumps]
         ReceptionDataRow += NDefectiveBumpsList
 
         self.ResultData['Table']['BODY'].append(ReceptionDataRow)
 
-        # todo: fill row for Pisa DB result
+        #fill row for Pisa DB result
+        try:
+            ModuleID = self.ParentObject.Attributes['ModuleID']
+            DB = GlobalDatabaseQuery()
+            rows = DB.GetFulltestPixelDefects(ModuleID=ModuleID)
 
-        # todo: fill row for local DB
+            if rows is None:
+                raise Exception("Could not connect to DB or module not found in DB! Use Configuration/GlobalDatabase.cfg to specify connection parameters to MySQL database!")
+
+            DBDataRow = ['Database']
+            DBDataRow.append(sum([x['Total'] for x in rows]))
+
+            NDeadPixelsDB = sum([x['nDeadPixel'] for x in rows])
+            DBDataRow.append(NDeadPixelsDB)
+            for ChipNo in range(len(chipResults)):
+                try:
+                    DBDataRow.append([x['nDeadPixel'] for x in rows if int(x['ROC_POS']) == ChipNo][0])
+                except:
+                    DBDataRow.append('#')
+
+            NMissingBumpsDB = sum([x['nDeadBumps'] for x in rows])
+            DBDataRow.append(NMissingBumpsDB)
+            for ChipNo in range(len(chipResults)):
+                try:
+                    DBDataRow.append([x['nDeadBumps'] for x in rows if int(x['ROC_POS']) == ChipNo][0])
+                except:
+                    DBDataRow.append('#')
+
+            self.ResultData['HiddenData']['NPixelDefectsDB'] = NDeadPixelsDB + NMissingBumpsDB
+            self.ResultData['Table']['BODY'].append(DBDataRow)
+        except Exception as inst:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            # Start red color
+            sys.stdout.write("\x1b[31m")
+            sys.stdout.flush()
+            print '\x1b[31mException while processing', self.FinalResultsStoragePath
+            # Print traceback
+            traceback.print_exception(exc_type, exc_obj, exc_tb)
+            # Stop red color
+            sys.stdout.write("\x1b[0m")
+            sys.stdout.flush()

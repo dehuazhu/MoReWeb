@@ -38,6 +38,10 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
 
     def PopulateResultData(self):
 
+        ROOT.gStyle.SetOptStat(0)
+        ROOT.gPad.SetLogy(0)
+        ROOT.gPad.SetLogx(0)
+
         NChips = self.ParentObject.Attributes['NumberOfChips']
         StartChip = self.ParentObject.Attributes['StartChip']
         self.ResultData['Plot']['ROOTObject'] = ROOT.TH1D(self.GetUniqueID(), '', NChips, StartChip, StartChip + NChips)
@@ -79,9 +83,13 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         # draw plot if data exists
         if IanaLossPerRoc:
 
-            if IanaLossProblems:
+            LowIanaLossRocs = [x for x in IanaLossPerRoc if x < 15.0]
+
+            if len(LowIanaLossRocs) > 1:
                 self.ResultData['KeyValueDictPairs']['IanaLossProblems']['Value'] = 'Yes'
                 self.ResultData['HiddenData']['IanaLossProblems'] = True
+            elif len(LowIanaLossRocs) > 0:
+                self.ResultData['KeyValueDictPairs']['IanaLossProblems']['Value'] = 'Only single ROC below'
             else:
                 self.ResultData['KeyValueDictPairs']['IanaLossProblems']['Value'] = 'No'
 

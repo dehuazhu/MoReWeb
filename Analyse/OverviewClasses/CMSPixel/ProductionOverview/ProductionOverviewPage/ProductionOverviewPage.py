@@ -2,11 +2,7 @@ import ROOT
 import AbstractClasses
 import os, json
 
-class SetEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, set):
-            return list(obj)
-        return json.JSONEncoder.default(self, obj)
+from AbstractClasses.Helper.SetEncoder import SetEncoder
 
 class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProductionOverview):
 
@@ -34,6 +30,22 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
         NumModulesMaxPerList = 50
 
         self.SumJSONFilesModules = []
+
+        SingleMinus20TestName = "m20_2"
+        try:
+            RequiredQualificationTypes = self.TestResultEnvironmentObject.Configuration['RequiredTestTypesForComplete'].strip().split(',')
+            if "m20_2" not in RequiredQualificationTypes:
+                print "No -20C test after cycling (m20_2) found!"
+                if "m20_1" in RequiredQualificationTypes:
+                    SingleMinus20TestName = "m20_1"
+                    print "=> using m20_1 instead!"
+                elif "p17_1" in RequiredQualificationTypes:
+                    SingleMinus20TestName = "p17_1"
+                    print "=> using p17_1 instead!"
+                else:
+                    print "\x1b[31mno equivalent test found!\x1b[0m"
+        except:
+            print "\x1b[31Could not decide which m20 test to use, check 'RequiredTestTypesForComplete' field in configuration!\x1b[0m"
 
         TestsList = ['m20_1', 'm20_2', 'p17_1']
         ReadbackParameters = [
@@ -96,7 +108,7 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
 
         self.SubPages.append({
             "InitialAttributes" : {
-                "Sections": ["BumpBonding", "DeadPixel", "PerformanceParameters", "DACs", "IVCurves", "Readback", "HighRate", "VcalCalibration"],
+                "Sections": ["BumpBonding", "DeadPixel", "PerformanceParameters", "DACs", "IVCurves", "Readback", "HighRate", "VcalCalibration", "ReadoutErrors"],
                 "DateBegin": self.Attributes['DateBegin'],
                 "DateEnd": self.Attributes['DateEnd'],
             }, 
@@ -104,19 +116,18 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
             "Module": "SectionNavigation"
         })
 
-        self.SubPages.append(
-            {
-                "Key": "GradingOverview",
-                "Module": "GradingOverview",
-                "InitialAttributes" : {
-                    "StorageKey" : "GradingOverview",
-                    "DateBegin": self.Attributes['DateBegin'],
-                    "DateEnd": self.Attributes['DateEnd'],
-                },
-            }
-        )
-
         if self.Attributes['ShowWeeklyPlots']:
+            self.SubPages.append(
+                {
+                    "Key": "GradingOverview",
+                    "Module": "GradingOverview",
+                    "InitialAttributes" : {
+                        "StorageKey" : "GradingOverview",
+                        "DateBegin": self.Attributes['DateBegin'],
+                        "DateEnd": self.Attributes['DateEnd'],
+                    },
+                }
+            )
             if not self.singleSubtest or 'Statistics' in self.singleSubtest:
                 self.SubPages.append(
                     {
@@ -165,6 +176,19 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                         },
                     }
                 )
+                self.SubPages.append(
+                    {
+                        "Key": "BBCorners",
+                        "Module": "BBCorners",
+                        "InitialAttributes" : {
+                            "StorageKey" : "BBCorners",
+                            "DateBegin": self.Attributes['DateBegin'],
+                            "DateEnd": self.Attributes['DateEnd'],
+                            "Test": SingleMinus20TestName,
+                        },
+                    }
+                )
+                self.IncludeSorttable = True
 
             if not self.singleSubtest or 'ModuleFailureOverview' in self.singleSubtest:
                 Offset = 0
@@ -193,12 +217,24 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                         "Key": "PrimaryFailureReason",
                         "Module": "PrimaryFailureReason",
                         "InitialAttributes" : {
+                            "StorageKey" : "PrimaryFailureReason",
                             "DateBegin": self.Attributes['DateBegin'],
                             "DateEnd": self.Attributes['DateEnd'],
                         },
                     }
                 )
-        else:     
+        else:
+            self.SubPages.append(
+                {
+                    "Key": "GradingOverview",
+                    "Module": "GradingOverview",
+                    "InitialAttributes" : {
+                        "StorageKey" : "GradingOverview",
+                        "DateBegin": self.Attributes['DateBegin'],
+                        "DateEnd": self.Attributes['DateEnd'],
+                    },
+                }
+            )
             self.SubPages.append(
                 {
                     "Key": "ModuleFailuresOverview",
@@ -208,6 +244,17 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                         "DateBegin": self.Attributes['DateBegin'],
                         "DateEnd": self.Attributes['DateEnd'],
                         "Width": 4,
+                    },
+                }
+            )
+            self.SubPages.append(
+                {
+                    "Key": "PrimaryFailureReason",
+                    "Module": "PrimaryFailureReason",
+                    "InitialAttributes" : {
+                        "StorageKey" : "PrimaryFailureReason",
+                        "DateBegin": self.Attributes['DateBegin'],
+                        "DateEnd": self.Attributes['DateEnd'],
                     },
                 }
             )
@@ -264,6 +311,84 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                     }
                 }
             )
+
+        if self.singleSubtest and 'XrayMap' in self.singleSubtest:
+            self.SubPages.append(
+                {
+                    "Key": "XrayMap",
+                    "Module": "XrayMap",
+                    "InitialAttributes" : {
+                        "Target": "Zn",
+                        "StorageKey" : "XrayMap_Zn",
+                        "DateBegin": self.Attributes['DateBegin'],
+                        "DateEnd": self.Attributes['DateEnd'],
+                    }
+                }
+            )
+            self.SubPages.append(
+                {
+                    "Key": "XrayMap",
+                    "Module": "XrayMap",
+                    "InitialAttributes" : {
+                        "Target": "Mo",
+                        "StorageKey" : "XrayMap_Mo",
+                        "DateBegin": self.Attributes['DateBegin'],
+                        "DateEnd": self.Attributes['DateEnd'],
+                    }
+                }
+            )
+            self.SubPages.append(
+                {
+                    "Key": "XrayMap",
+                    "Module": "XrayMap",
+                    "InitialAttributes" : {
+                        "Target": "Ag",
+                        "StorageKey" : "XrayMap_Ag",
+                        "DateBegin": self.Attributes['DateBegin'],
+                        "DateEnd": self.Attributes['DateEnd'],
+                    }
+                }
+            )
+            self.SubPages.append(
+                {
+                    "Key": "XrayMap",
+                    "Module": "XrayMap",
+                    "InitialAttributes" : {
+                        "Target": "Sn",
+                        "StorageKey" : "XrayMap_Sn",
+                        "DateBegin": self.Attributes['DateBegin'],
+                        "DateEnd": self.Attributes['DateEnd'],
+                    }
+                }
+            )
+
+        ### dead pixel clusters###
+        if self.singleSubtest and 'DeadPixelClusters' in self.singleSubtest:
+            self.SubPages.append({"InitialAttributes" : {"Anchor": "DefectClusters", "Title": "Defect Clusters"}, "Key": "Section","Module": "Section"})
+            self.SubPages.append(
+                {
+                    "Key": "DeadPixelClusters",
+                    "Module": "DeadPixelClusters",
+                    "InitialAttributes" : {
+                        "Test": SingleMinus20TestName,
+                        "StorageKey" : "DeadPixelClusters",
+                        "DateBegin": self.Attributes['DateBegin'],
+                        "DateEnd": self.Attributes['DateEnd'],
+                    }
+                }
+            )
+            self.SubPages.append(
+                {
+                    "Key": "DeadPixelClustersP17",
+                    "Module": "DeadPixelClusters",
+                    "InitialAttributes" : {
+                        "Test": "p17_1",
+                        "StorageKey" : "DeadPixelClustersP17",
+                        "DateBegin": self.Attributes['DateBegin'],
+                        "DateEnd": self.Attributes['DateEnd'],
+                    }
+                }
+            )
         ### dead pixels ###
         if not self.singleSubtest or 'DeadPixels' in self.singleSubtest:
             self.SubPages.append({"InitialAttributes" : {"Anchor": "DeadPixel", "Title": "Dead Pixels"}, "Key": "Section","Module": "Section"})
@@ -273,7 +398,7 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                         "Key": "DeadPixelOverlay_{Grade}".format(Grade = Grade),
                         "Module": "DeadPixelOverlay",
                         "InitialAttributes" : {
-                            "Test": "m20_2",
+                            "Test": SingleMinus20TestName,
                             "Grade": "{Grade}".format(Grade = Grade),
                             "StorageKey" : "DeadPixelOverlay_{Grade}".format(Grade = Grade),
                             "DateBegin": self.Attributes['DateBegin'],
@@ -290,7 +415,7 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                         "Key": "ThresholdDefectsOverlay_{Grade}".format(Grade = Grade),
                         "Module": "ThresholdDefectsOverlay",
                         "InitialAttributes" : {
-                            "Test": "m20_2",
+                            "Test": SingleMinus20TestName,
                             "Grade": "{Grade}".format(Grade = Grade),
                             "StorageKey" : "ThresholdDefectsOverlay_{Grade}".format(Grade = Grade),
                             "DateBegin": self.Attributes['DateBegin'],
@@ -307,7 +432,7 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                         "Key": "GainOverlay_{Grade}".format(Grade = Grade),
                         "Module": "GainOverlay",
                         "InitialAttributes" : {
-                            "Test": "m20_2",
+                            "Test": SingleMinus20TestName,
                             "Grade": "{Grade}".format(Grade = Grade),
                             "StorageKey" : "GainOverlay_{Grade}".format(Grade = Grade),
                             "DateBegin": self.Attributes['DateBegin'],
@@ -651,6 +776,7 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                     "Key": "Duration",
                     "Module": "Duration",
                     "InitialAttributes" : {
+                        "StorageKey" : "Duration",
                         "DateBegin": self.Attributes['DateBegin'],
                         "DateEnd": self.Attributes['DateEnd'],
                     }
@@ -796,12 +922,13 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
 
 
         ### Errors ###
-        self.SubPages.append({"InitialAttributes" : {"Anchor": "VcalCalibration", "Title": "Readout Errors", "Caption": "<i>First bin means <strong>no errors</strong> and last bin includes overflow.</i>"}, "Key": "Section", "Module": "Section"})
+        self.SubPages.append({"InitialAttributes" : {"Anchor": "ReadoutErrors", "Title": "Readout Errors", "Caption": "<i>First bin means <strong>no errors</strong> and last bin includes overflow.</i>"}, "Key": "Section", "Module": "Section"})
         if not self.singleSubtest or 'Errors' in self.singleSubtest:
             for ErrorType in ['nErrors', 'nWarnings', 'nCriticals', 'message_daqerror_count',
                               'message_datasize_count','message_deser400_count', 'message_eventid_count',
                               'message_missingevents_count', 'message_notokenpass_count', 'message_readback_count',
                               'message_tokenchain_count', 'message_usbtimeout_count']:
+                continue
                 self.SubPages.append(
                     {
                         "Key": "ErrorsVsFW",
@@ -841,8 +968,9 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
         for SumJSONFilesModule in self.SumJSONFilesModules:
             print("merge JSON files for '%s'..."%SumJSONFilesModule)
             TotalJSONDict = {}
-            for Page in [x for x in self.SubPages if x['Key'] == SumJSONFilesModule]:
+            for Page in [x for x in self.SubPages if x['Module'] == SumJSONFilesModule]:
                 Path = self.GlobalOverviewPath + '/' + self.Attributes['BasePath'] + '/' + Page['InitialAttributes']['StorageKey'] + "/KeyValueDictPairs.json"
+
                 with open(Path) as data_file:
                     JSONData = json.load(data_file)
                     TotalJSONDict.update(JSONData)

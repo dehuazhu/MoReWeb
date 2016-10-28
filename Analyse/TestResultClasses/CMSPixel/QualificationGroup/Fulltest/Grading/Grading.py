@@ -37,9 +37,9 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
             ROCSummaryResult = i['TestResultObject'].ResultData['SubTestResults']['Summary']
             TotalPixelDefectsROC = int(ROCSummaryResult.ResultData['KeyValueDictPairs']['Total']['Value'])
 
-            if TotalPixelDefectsROC > 0.04 * self.nCols * self.nRows:
+            if TotalPixelDefectsROC >= self.TestResultEnvironmentObject.GradingParameters['defectsC']:
                 PixelDefectsRocsC += 1
-            elif TotalPixelDefectsROC > 0.01 * self.nCols * self.nRows:
+            elif TotalPixelDefectsROC >= self.TestResultEnvironmentObject.GradingParameters['defectsB']:
                 PixelDefectsRocsB += 1
             else:
                 PixelDefectsRocsA += 1
@@ -200,8 +200,9 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         GradeComment = ''
         ManualGrade = self.check_for_manualGrade()
         if ManualGrade != '':
-            GradeComment = "Grade manually changed from "+str(GradeMapping[ModuleGrade])+" to "+str(GradeMapping[int(ManualGrade)])
-            print GradeComment
+            if GradeMapping[ModuleGrade] != GradeMapping[int(ManualGrade)]:
+                GradeComment = "Grade manually changed from "+str(GradeMapping[ModuleGrade])+" to "+str(GradeMapping[int(ManualGrade)])
+                print GradeComment
             ModuleGrade =int(ManualGrade)
 
         print 'Fulltest Summary:'

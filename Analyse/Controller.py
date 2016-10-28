@@ -114,6 +114,9 @@ Configuration.read([
     'Configuration/ProductionOverview.cfg'
     ])
 
+if os.path.isfile('Configuration/UserConfiguration.cfg'):
+    Configuration.read(['Configuration/UserConfiguration.cfg'])
+
 if args.use_global_db:
     Configuration.set('SystemConfiguration', 'UseGlobalDatabase', '1')
 
@@ -359,6 +362,12 @@ def AnalyseTestData(ModuleInformationRaw,ModuleFolder):
     ModuleTestResult.GenerateFinalOutput()
     ModuleTestResults.append(ModuleTestResult)
     CopyMD5File(TestResultEnvironmentInstance.FinalModuleResultsPath)
+    print '    Clean up'
+    try:
+        ModuleTestResult.CleanUp()
+    except:
+        pass
+
     print 'DONE'
     pass
 
@@ -386,6 +395,9 @@ def AnalyseSingleQualification(Folder):
 
 def AnalyseAllTestDataInDirectory(GlobalDataDirectory):
     Folders = os.listdir(GlobalDataDirectory)
+    Folders.sort()
+    print "FOLDERS:"
+    print Folders
     FoldersToBeAnalyzed = []
 
     for Folder in Folders:
@@ -681,17 +693,22 @@ if args.output_csv:
 
             # add new modules
             if ModuleID not in ModuleData:
-                ModuleData[ModuleID] = {'Grade': 'M', 'LeakageCurrent': -1, 'PixelDefects': -1}
+                ModuleData[ModuleID] = {'Grade': 'M', 'FullQualificationGrade': None, 'XrayGrade': None,  'LeakageCurrent': -1, 'PixelDefects': -1}
 
             # add FullQualification data
             if Row['QualificationType'] == 'FullQualification':
                 Grade = Row['Grade']
+                if ModuleData[ModuleID]['FullQualificationGrade'] is None:
+                    ModuleData[ModuleID]['FullQualificationGrade'] = Grade
                 PixelDefects = int(Row['PixelDefects']) if Row['PixelDefects'] else -1
 
                 # grade, if worse
                 if Grade in GradeOrdering:
                     if GradeOrdering[Grade] > GradeOrdering[ModuleData[ModuleID]['Grade']]:
                         ModuleData[ModuleID]['Grade'] = Grade
+                    print "worst:",ModuleData[ModuleID]['FullQualificationGrade']
+                    if GradeOrdering[Grade] > GradeOrdering[ModuleData[ModuleID]['FullQualificationGrade']]:
+                        ModuleData[ModuleID]['FullQualificationGrade'] = Grade
 
                 # number of defects, if higher
                 if PixelDefects > ModuleData[ModuleID]['PixelDefects']:
@@ -709,7 +726,7 @@ if args.output_csv:
             # add X-ray data
             if Row['TestType'] == 'XRayHRQualification':
                 Grade = Row['Grade']
-
+                ModuleData[ModuleID]['XrayGrade'] = Grade
                 # grade, if worse
                 if Grade and Grade in GradeOrdering:
                     if GradeOrdering[Grade] > GradeOrdering[ModuleData[ModuleID]['Grade']]:
@@ -718,7 +735,7 @@ if args.output_csv:
         CSVPath = GlobalOverviewPath + '/ModuleResultDB.csv'
         with open(CSVPath, 'w') as csvfile:
             for ModuleID, Data in ModuleData.iteritems():
-                CSVLine = "%s, %s, %d, %e\n"%(ModuleID, Data['Grade'], Data['PixelDefects'], Data['LeakageCurrent'])
+                CSVLine = "%s, %s, %s, %s, %d, %e\n"%(ModuleID, Data['Grade'], Data['FullQualificationGrade'], Data['XrayGrade'], Data['PixelDefects'], Data['LeakageCurrent'])
                 csvfile.write(CSVLine)
                 print CSVLine,
 
@@ -740,11 +757,11 @@ print '\nErrorList:'
 ModulePath = ''
 ModuleID = ''
 for i in TestResultEnvironmentInstance.ErrorList:
-    if i['ModuleID'] != ModuleID:
+    if 'ModuleID' in i and i['ModuleID'] != ModuleID:
         print (i['ModuleID'] if len(i['ModuleID']) > 0 else 'MODULE') + ':'
         ModulePath = ''
         ModuleID = i['ModuleID']
-    if i['ModulePath'] != ModulePath:
+    if 'ModulePath' in i and i['ModulePath'] != ModulePath:
         print "  %s"%i['ModulePath']
         ModulePath = i['ModulePath']
     ColumnWidth = 10
@@ -777,8 +794,17 @@ else:
 try:
     if len(ModulesNotInsertedIntoDB) > 0:
         print 'Modules not inserted into DB: %s'%','.join(ModulesNotInsertedIntoDB)
+
+        # if there was no error with processing
+        if ExitCode == 0:
+            # indicate there was an error with insertion
+            ExitCode = 999
 except:
     pass
+
+if len(ModulesNotInsertedIntoDB) < 1 and len(TestResultEnvironmentInstance.ModulesInsertedIntoDB) < 1:
+    print "Nothing to be inserted!"
+    ExitCode = 404
 
 print 'inserted: ', TestResultEnvironmentInstance.ModulesInsertedIntoDB
 print 'failed: ', ModulesNotInsertedIntoDB

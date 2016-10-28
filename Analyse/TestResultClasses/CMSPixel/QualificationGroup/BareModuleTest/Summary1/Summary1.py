@@ -47,12 +47,16 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
 
         DeadPixels = 0
         DeadBumps = 0
+        DeadBumpsBB2 = 0
         MissingBumps = 0
         totalMissingBumps = 0
+        totalMissingBumpsBB2 = 0
         totalDeadBumps = 0
         totalDeadPixels = 0
         listDefectBumps = []
         listDefectAlive = []
+
+
 
         # obtain the values to get dispayed
 
@@ -68,9 +72,15 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         for i in chipResults:
             
             if self.ParentObject.testSoftware == 'pxar':
-                DeadPixels = int(i['TestResultObject'].ResultData['SubTestResults']['PixelMap'].ResultData['KeyValueDictPairs']['NDeadPixels']['Value']);
-                totalDeadPixels = totalDeadPixels + DeadPixels;
-                listDefectAlive = i['TestResultObject'].ResultData['SubTestResults']['PixelMap'].ResultData['KeyValueDictPairs']['DeadPixels']['Value'];
+                try:
+                    DeadPixels = int(i['TestResultObject'].ResultData['SubTestResults']['PixelMap'].ResultData['KeyValueDictPairs']['NDeadPixels']['Value']);
+                    totalDeadPixels = totalDeadPixels + DeadPixels;
+                    listDefectAlive = i['TestResultObject'].ResultData['SubTestResults']['PixelMap'].ResultData['KeyValueDictPairs']['DeadPixels']['Value'];
+                except:
+                    print 'No PixelAlive data for Chip ',i['TestResultObject'].Attributes['ChipNo'],' adding 4160 dead pixels!'
+                    #DeadPixels = 4160;
+                    totalDeadPixels = totalDeadPixels + 4160;
+
             else:
                 DeadPixels = int(i['TestResultObject'].ResultData['SubTestResults']['BarePixelMap'].ResultData['KeyValueDictPairs']['NDeadPixels']['Value']);
                 totalDeadPixels = totalDeadPixels + DeadPixels;
@@ -78,8 +88,9 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
             
 
             if not listDefectAlive:
-                print 'Nothing here'
+                print 'pixel alive test without defects'
             else:
+            #if listDefectAlive:
                 #print 'blabla', listDefectAlive
                 combsAlive = []
                 roccombsAlive = {}
@@ -111,6 +122,9 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         globalRH = ""
         globalBBcut = ""
         globalBMname = ""
+        globaluseBB2Map = ""
+        #useBB2Map = "yes"
+
         
         if os.path.isfile(bareModulefilename):        
             BareModuleInfoFile = open(bareModulefilename, "r")
@@ -118,7 +132,7 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         
             if BareModuleInfoFile:
                 for line in BareModuleInfoFile:
-                    print 'line',line
+                    #print 'line',line
                     results  = line.strip().split()
                     if len(results) == 2:
                         Key, ParameterValue = results
@@ -135,8 +149,11 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
                             globalBBcut = ParameterValue
                         if (Key=="BMname:"):
                             globalBMname = ParameterValue
+                        if (Key=="useBB2Map:"):
+                            globaluseBB2Map = ParameterValue
 
                         print 'globalNameLab: ',globalNameLab
+                        print 'globaluseBB2Map: ',globaluseBB2Map
 
             BareModuleInfoFile.close()
 
@@ -155,27 +172,46 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
                 
         allrocslist = []
         allrocs2 = {}
+        allrocslistBB2 = []
+        allrocs2BB2 = {}
 
         digCurrentList = {}
         listPlWidthCut = {}
 
         for i in chipResults:
             if self.ParentObject.testSoftware == 'pxar':
-                chipNum = i['TestResultObject'].Attributes['ChipNo'];
-                #print 'DIgCurrent???! ', (i['TestResultObject'].ResultData['SubTestResults']['DigChipCurrent'].ResultData['KeyValueDictPairs']['MaxCurrent']['Value'])
-                valdigChip =  (i['TestResultObject'].ResultData['SubTestResults']['DigChipCurrent'].ResultData['KeyValueDictPairs']['MaxCurrent']['Value'])
-                #print 'DIgCurrent???! ',valdigChip
-                if valdigChip=='None':                    
-                    digCurrentList[chipNum] = 'None'
-                else:
-                    digCurrentList[chipNum] = 1000.*i['TestResultObject'].ResultData['SubTestResults']['DigChipCurrent'].ResultData['KeyValueDictPairs']['MaxCurrent']['Value'];
-                #print 'chipno ',i['TestResultObject'].Attributes['ChipNo']
-                #print 'DIgCurrent???! ', (i['TestResultObject'].ResultData['SubTestResults']['DigChipCurrent'].ResultData['KeyValueDictPairs']['MaxCurrent']['Value']),i
 
-                DeadBumps = int(i['TestResultObject'].ResultData['SubTestResults']['BumpBondingProblems'].ResultData['KeyValueDictPairs']['NDeadBumps']['Value']);
-                totalMissingBumps = totalMissingBumps + DeadBumps;
-                #print 'Inside Chips-loop:',i,totalDeadBumps
-                listDefectBumps = i['TestResultObject'].ResultData['SubTestResults']['BumpBondingProblems'].ResultData['KeyValueDictPairs']['DeadBumps']['Value'];
+                try:
+                    chipNum = i['TestResultObject'].Attributes['ChipNo'];
+                    #print 'DIgCurrent???! ', (i['TestResultObject'].ResultData['SubTestResults']['DigChipCurrent'].ResultData['KeyValueDictPairs']['MaxCurrent']['Value'])
+                    valdigChip =  (i['TestResultObject'].ResultData['SubTestResults']['DigChipCurrent'].ResultData['KeyValueDictPairs']['MaxCurrent']['Value'])
+                    #print 'DIgCurrent???! ',valdigChip
+                    if valdigChip=='None':                    
+                        digCurrentList[chipNum] = 'None'
+                    else:
+                        digCurrentList[chipNum] = 1000.*i['TestResultObject'].ResultData['SubTestResults']['DigChipCurrent'].ResultData['KeyValueDictPairs']['MaxCurrent']['Value'];
+                    #print 'chipno ',i['TestResultObject'].Attributes['ChipNo']
+                    #print 'DIgCurrent???! ', (i['TestResultObject'].ResultData['SubTestResults']['DigChipCurrent'].ResultData['KeyValueDictPairs']['MaxCurrent']['Value']),i
+
+                    DeadBumps = int(i['TestResultObject'].ResultData['SubTestResults']['BumpBondingProblems'].ResultData['KeyValueDictPairs']['NDeadBumps']['Value']);
+                    totalMissingBumps = totalMissingBumps + DeadBumps;
+                    #print 'Inside Chips-loop :',chipNum,' : ',totalDeadBumps
+                    listDefectBumps = i['TestResultObject'].ResultData['SubTestResults']['BumpBondingProblems'].ResultData['KeyValueDictPairs']['DeadBumps']['Value'];
+
+                    #Check if BB2 Histogram exist:
+                    if (globaluseBB2Map=='yes'):
+                        listDefectBumpsBB2 = i['TestResultObject'].ResultData['SubTestResults']['BareBBMap'].ResultData['KeyValueDictPairs']['MissingBumps']['Value'];
+                        DeadBumpsBB2 = int(i['TestResultObject'].ResultData['SubTestResults']['BareBBMap'].ResultData['KeyValueDictPairs']['NMissingBumps']['Value']);
+                        totalMissingBumpsBB2 = totalMissingBumpsBB2 + DeadBumpsBB2;
+
+                except:
+                    print 'No BB-Histogram is found Chip: ', i['TestResultObject'].Attributes['ChipNo']
+                    #DeadBumps = 4160;
+                    totalMissingBumps = totalMissingBumps + 4160;
+                    #DeadBumpsBB2 = 4160;
+                    totalMissingBumpsBB2 = totalMissingBumpsBB2 + 4160;
+
+
             else:
                 chipNum = i['TestResultObject'].Attributes['ChipNo'];
                 MissingBumps = int(i['TestResultObject'].ResultData['SubTestResults']['BareBBMap'].ResultData['KeyValueDictPairs']['NMissingBumps']['Value']);
@@ -188,8 +224,9 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
 
 
             if not listDefectBumps:
-                print 'Nothing here'
+                print 'No list of DefectBumps'
             else:
+            #if listDefectBumps:
                 #print 'blabla', listDefectBumps
                 combs = []
                 roccombs = {}
@@ -203,6 +240,25 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
                 roccombs[finalword] = combs
                 allrocslist.append(roccombs)
                 allrocs2[finalword] = combs
+
+
+            if (globaluseBB2Map=='yes'):
+                if not listDefectBumpsBB2:
+                    print 'listDefectBB2 empty'
+                else:
+                    combsBB2 = []
+                    roccombsBB2 = {}
+                    for key in listDefectBumpsBB2:
+                        dataChipBB2 = key[0];
+                        val1BB2 = key[1];
+                        val2BB2 = key[2];
+                    #print 'again ',dataChip, val1, val2
+                        combsBB2.append((val1BB2,val2BB2))
+                        finalwordBB2 = "ROC" + str(dataChipBB2)
+                    roccombsBB2[finalwordBB2] = combsBB2
+                    allrocslistBB2.append(roccombsBB2)
+                    allrocs2BB2[finalwordBB2] = combsBB2
+
 
         print 'allroclist ',json.dumps(allrocslist, separators=(',', ':'))
         print 'totalMissingBumps: ',totalMissingBumps,totalDeadBumps
@@ -222,22 +278,47 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
         fbbmapforDB.write('BB_cut_criteria: ' + str(listPlWidthCut) + '\n')
         fbbmapforDB.close()
         
+        if (globaluseBB2Map=='yes'):
+            fdefectBB2 = open(self.FinalResultsStoragePath +'/' + bareModuleBBDBName +'/' + 'defectsBB2.json', 'w')        
+            fdefectBB2.write(json.dumps(allrocs2BB2, separators=(',', ': ')))
+            fdefectBB2.close()
+            
+            fbbmap2forDB = open(self.FinalResultsStoragePath +'/' + bareModuleBBDBName +'/' + 'Bare_module_QA_BumpBB2.csv', 'w')
+            fbbmap2forDB.write('Bare_module_ID: ' +  bareModuleIDName + '\n')
+            fbbmap2forDB.write('Laboratory_ID: ' +  ' ' +  globalNameLab + '\n')
+            fbbmap2forDB.write('Operator_NickName: ' +  ' ' + globalOperatorName + '\n')
+            fbbmap2forDB.write('Temperature: ' + globalTemp +'\n')
+            fbbmap2forDB.write('RH: ' + globalRH + '\n' )
+            fbbmap2forDB.write('Dead_Missing_Channels: ' + str(totalMissingBumpsBB2) + '\n' )
+        #fbbmapforDB.write('BB_cut_criteria: ' + globalBBcut + '\n')
+            fbbmap2forDB.write('BB_cut_criteria: ' + str(listPlWidthCut) + '\n')
+            fbbmap2forDB.close()
+
         # copy png images to this DB subdirectory
         
         if self.ParentObject.testSoftware == 'pxar':
             srcBumpBondingFigDir = str(self.FinalResultsStoragePath).split('Summary1')[-2]+'BumpBondingMap/BumpBondingMap.png'
             srcPixelAliveFigDir = str(self.FinalResultsStoragePath).split('Summary1')[-2]+'BarePixelMap/BarePixelMap.png'
+            if (globaluseBB2Map=='yes'):
+                srcBumpBondingBB2FigDir = str(self.FinalResultsStoragePath).split('Summary1')[-2]+'bareBBMap/bareBBMap.png'
+
         else:
             srcBumpBondingFigDir = str(self.FinalResultsStoragePath).split('Summary1')[-2]+'bareBBMap/bareBBMap.png'
             srcPixelAliveFigDir = str(self.FinalResultsStoragePath).split('Summary1')[-2]+'BarePixelMap/BarePixelMap.png'
 
         shutil.copyfile(srcBumpBondingFigDir,self.FinalResultsStoragePath +'/' + bareModuleBBDBName +'/bareModuleQA.png' )
         shutil.copyfile(srcPixelAliveFigDir,self.FinalResultsStoragePath +'/' + bareModulePADBName +'/bareModuleQA.png' )
+        if (globaluseBB2Map=='yes'):
+            shutil.copyfile(srcBumpBondingBB2FigDir,self.FinalResultsStoragePath +'/' + bareModuleBBDBName +'/bareModuleBB2QA.png' )
 
         self.ResultData['KeyValueDictPairs'] = {
             'NMissingBumps': {
                 'Value':totalMissingBumps,
                 'Label':'Total MissingBumps'
+            },
+            'NMissingBumpsBB2': {
+                'Value':totalMissingBumpsBB2,
+                'Label':'Total MissingBumpsBB2'
             },
             'NDeadBumps': {
                 'Value':totalDeadPixels,
@@ -245,9 +326,12 @@ class TestResult(AbstractClasses.GeneralTestResult.GeneralTestResult):
             },
         }
 
+        #self.ResultData['KeyList'] = ['NMissingBumps','NDeadBumps']
+        if (globaluseBB2Map=="yes"):
+            self.ResultData['KeyList'] = ['NMissingBumps','NMissingBumpsBB2','NDeadBumps']
+        else:
+            self.ResultData['KeyList'] = ['NMissingBumps','NDeadBumps']
 
-        self.ResultData['KeyList'] = ['NMissingBumps','NDeadBumps']
-        
         # prepare also DAC files for DB upload
         DirectoryDac = self.RawTestSessionDataPath
         DirectoryDacToSave = self.FinalResultsStoragePath +'/' + bareModuleBBDBName

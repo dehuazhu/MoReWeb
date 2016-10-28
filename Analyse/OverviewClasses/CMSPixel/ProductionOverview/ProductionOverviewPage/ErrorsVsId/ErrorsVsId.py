@@ -46,13 +46,17 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
                 try:
                     DTB_FW = self.GetJSONValue([RowTuple['RelativeModuleFinalResultsPath'], RowTuple['FulltestSubfolder'], 'Summary2', 'KeyValueDictPairs.json', 'DTB_FW', 'Value'])
                     if DTB_FW is None:
-                        raise
+                        DTB_FW = 'NA'
                 except:
                     DTB_FW = 'NA'
-                if DTB_FW not in DTB_FWs:
-                    DTB_FWs.append(DTB_FW)
-                NTests +=1
-                BinNames.append(RowTuple['ModuleID'])
+                try:
+                    if DTB_FW not in DTB_FWs:
+                        DTB_FWs.append(DTB_FW)
+                    NTests +=1
+                    BinNames.append(RowTuple['ModuleID'] if len(RowTuple['ModuleID'].strip()) > 0 else '')
+                except:
+                    print "could not add module",RowTuple," to error statistics plot."
+
 
         # initialize histograms
         Histograms = {}
@@ -62,9 +66,11 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
             Histograms[DTB_FW].GetXaxis().SetNdivisions(-NTests)
             Histograms[DTB_FW].GetXaxis().SetTickLength(0.015)
             Histograms[DTB_FW].GetYaxis().SetTickLength(0.012)
-            Histograms[DTB_FW].GetXaxis().SetAxisColor(1, 0.4)
-            Histograms[DTB_FW].GetYaxis().SetAxisColor(1, 0.4)
-
+            try:
+                Histograms[DTB_FW].GetXaxis().SetAxisColor(1, 0.4)
+                Histograms[DTB_FW].GetYaxis().SetAxisColor(1, 0.4)
+            except:
+                pass
             HistogramsCreated = HistogramsCreated and Histograms[DTB_FW]
 
         # extract data
@@ -129,7 +135,10 @@ class ProductionOverview(AbstractClasses.GeneralProductionOverview.GeneralProduc
         for DTB_FW, Histogram in Histograms.iteritems():
             Histograms[DTB_FW].SetLineColor(HistogramColors[HistogramColorIndex])
             Histograms[DTB_FW].SetLineWidth(1)
-            Histograms[DTB_FW].SetFillColorAlpha(HistogramColors[HistogramColorIndex], 0.25)
+            try:
+                Histograms[DTB_FW].SetFillColorAlpha(HistogramColors[HistogramColorIndex], 0.25)
+            except:
+                pass
             HistogramColorIndex += 1
             if HistogramColorIndex >= len(HistogramColors):
                 HistogramColorIndex = 0
